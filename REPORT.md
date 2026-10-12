@@ -11,9 +11,9 @@
 
 ## Kết quả cuối
 
-- `dataset_version` của bạn: `40c5e60cd5cc` (đối chiếu lại với `report/evidence/run_summary.json` sau lần chạy cuối).
+- `dataset_version` của bạn: `40c5e60cd5cc`, khớp `report/evidence/run_summary.json` sau lần chạy cuối.
 - Số khung hình train / val / test của bạn: **694 / 149 / 176**, tổng **1.019 khung**, thuộc **18 / 4 / 4 trip**.
-- `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
+- `report/verify.txt`: đã lưu bằng `python3 scripts/check_submission.py --save-verify`, kết quả **27/27 checks passed**.
 - Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
 
 ## Bước 1 · Bronze
@@ -123,7 +123,11 @@ Clear riêng task lỗi giúp trip này thành công ở **lần thử 2**, như
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
 
-(trả lời ở đây)
+Khi tăng lên 500 xe, lượng video nhiều hơn nhưng vẫn chỉ có một máy xử lý lần lượt, nên hàng đợi dài và pipeline có thể không hoàn thành kịp. Cách mở rộng là phân chia công việc cho nhiều máy xử lý.
+
+1. **Xử lý video:** `silver_frames` chỉ chạy một trip cùng lúc trên LocalExecutor. Tôi sẽ tách worker xử lý video sang nhiều máy, dùng CeleryExecutor hoặc KubernetesExecutor, đồng thời giữ khả năng chạy lại riêng từng trip. 
+2. **Biến đổi và join:** dbt dùng chung một file DuckDB trên máy lab; lượng dữ liệu lớn sẽ tăng nhu cầu RAM và thời gian xử lý. Tôi sẽ chuyển phần biến đổi sang Spark SQL trên các partition Delta và giữ lại các quality gate.
+3. **Lưu trữ và I/O:** MinIO dùng một volume; mỗi trip tải video drive riêng, rồi ghi từng ảnh JPG và copy sang Gold. Tôi sẽ dùng object storage phân tán, cache video và gom ảnh thành shard khi phục vụ huấn luyện để giảm việc đọc lặp và số request nhỏ.
 
 ## Câu hỏi riêng của bạn trên Metabase
 
@@ -146,4 +150,6 @@ Kết quả trong `report/evidence/metabase_question.json`: **`trip-04622` của
 
 Điều bạn thấy bất ngờ nhất, điều gì còn chưa rõ, và một lỗi dữ liệu mà bạn nghĩ pipeline **chưa** bắt được (nếu có). Tối đa 8 dòng.
 
-(trả lời ở đây)
+Điểm đáng chú ý là cùng một khung hình có thể mang nhiều cờ lỗi, nên cộng các cột lỗi lại chưa chắc ra số khung bị loại.
+Tôi muốn tìm hiểu thêm cách chọn ngưỡng dHash để phân biệt camera đứng hình với cảnh ít thay đổi khi xe chạy chậm.
+Pipeline kiểm tra tốc độ nhưng có thể vẫn bỏ sót GPS nhảy vị trí; có thể thêm kiểm tra tính nhất quán giữa vị trí, tốc độ và thời gian.
