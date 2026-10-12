@@ -125,7 +125,18 @@ Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipe
 
 Câu SQL bạn thêm vào dashboard và điều nó cho biết:
 
-(trả lời ở đây)
+Tôi thêm câu hỏi **“Trip nào có tỷ lệ khung bị loại cao nhất?”** vào dashboard `http://localhost:3000/dashboard/2`:
+
+```sql
+SELECT drive_id, trip_id, frames, frames_kept,
+       frames - frames_kept AS frames_dropped,
+       ROUND(100.0 * (frames - frames_kept) / NULLIF(frames, 0), 2) AS dropped_pct,
+       avg_speed_kmh, split
+FROM marts.mart_trip_summary
+ORDER BY dropped_pct DESC, trip_id;
+```
+
+Kết quả trong `report/evidence/metabase_question.json`: **`trip-04622` của drive A bị loại 34/60 khung (56,67%)**, cao nhất; tiếp theo `trip-03904` là **11/22 (50%)**, `trip-02086` là **28/60 (46,67%)**. Câu hỏi giúp ưu tiên kiểm tra chất lượng từng trip; số khung bị loại tính bằng tổng trừ số giữ lại để không đếm trùng các cờ. Tỷ lệ này chưa chỉ ra nguyên nhân cụ thể, nên cần đối chiếu cờ ở Silver và mẫu ảnh trước khi kết luận.
 
 ## Nhìn lại
 
