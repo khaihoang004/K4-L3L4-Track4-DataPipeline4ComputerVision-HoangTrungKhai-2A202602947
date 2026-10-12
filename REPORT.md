@@ -64,18 +64,24 @@ Trong `report/evidence/break_gate.json`, khi nới luật làm sạch lên **1.0
 ### Câu 4
 Dựa vào `idempotency.json`: số dòng trước và sau hai lần chạy lại, và khi ghi kiểu `append`. Vì sao Delta `overwrite` theo partition (một trip) an toàn hơn xoá rồi ghi lại, nhất là khi giữa chừng có lỗi?
 
-(trả lời ở đây)
+Thí nghiệm với **`trip-00003`** ghi trong `idempotency.json` cho thấy bảng `silver.frames` có **1.246 dòng** trước và sau hai lần chạy lại; dấu vân tay đều là **`6c7480dfde7e`**, và `unchanged=true`. Trip này có **60 khung**; ghi kiểu append hai lần vào bảng thử tạo **120 dòng**, tức gấp đôi số khung của trip.
+
+Delta overwrite theo predicate `trip_id` thay thế dữ liệu của đúng trip trong một commit, giữ nguyên các trip khác. Người đọc thấy snapshot trước hoặc sau commit, tránh trạng thái partition đã bị xoá nhưng chưa ghi lại đủ như cách xoá rồi ghi qua hai thao tác riêng. Nếu ghi Delta thất bại trước commit, snapshot đã commit vẫn còn để chạy lại. Tính nguyên tử này áp dụng cho bảng Delta; ảnh JPG trên object storage được ghi riêng, không cùng một transaction với bảng.
 
 ### Câu 5
 Khung hình **đen** và khung hình **tối** khác nhau thế nào, pipeline xử lý khác nhau ra sao, bạn có đồng ý không? Dựa vào `threshold.json`: nếu chọn ngưỡng 0, 2, 6 thì bao nhiêu khung bị coi là trùng ở mỗi drive? Bạn chọn ngưỡng nào, vì sao, và ngưỡng đó phụ thuộc vào tốc độ xe thế nào?
 
 | dHash khác tối đa | số khung trùng, drive A | số khung trùng, drive B |
 |---|---|---|
-| 0 | | |
-| 2 | | |
-| 6 | | |
+| 0 | 61 | 8 |
+| 2 | 149 | 53 |
+| 6 | 363 | 244 |
 
-(trả lời ở đây)
+Pipeline coi khung có độ sáng trung bình **< 12** là đen, còn độ sáng **từ 12 đến dưới 40** là tối. Khung đen bị loại khỏi Gold; khung tối chỉ được gắn cờ, vẫn có thể được giữ nếu đạt các điều kiện khác. Tôi đồng ý vì cảnh đường hầm hoặc bóng râm vẫn là dữ liệu cần học, trong khi khung gần như đen chứa rất ít thông tin. Bước 3 của tôi có **602 khung A**, **644 khung B**: khung đen **6/4**, khung mờ **9/0**, khung tối **4/61**, khung gần trùng **149/53**, mất đồng bộ **7/7**. Các cờ có thể chồng lên cùng một khung nên không cộng trực tiếp để tính số khung bị loại.
+
+Theo `threshold.json`, ngưỡng 6 đánh dấu **363/602 khung A** và **244/644 khung B**, cao hơn nhiều so với ngưỡng 2. Tôi chọn **2** làm mức ban đầu để giảm khung lặp mà chưa loại quá mạnh các thay đổi nhỏ thật sự; việc chọn tốt nhất vẫn cần xem mẫu ảnh và đánh giá mô hình. Khi xe chậm hoặc đứng yên, hai khung liên tiếp tự nhiên giống nhau hơn, nên dHash nhỏ không đủ kết luận camera bị đứng hình; khi xe nhanh, ngưỡng quá cao có thể loại các khung có thông tin mới.
+
+Kiểm tra module 3 đạt **6/6**, unit test đạt **9/9**. Độ trễ nối theo event time trung bình là **66 ms ở A**, **73 ms ở B**, nhưng tối đa **2.884/3.112 ms** do khoảng thiếu telemetry; Gold chỉ giữ khung đồng bộ trong ngưỡng **150 ms**.
 
 ## Bước 4 · Gold
 
