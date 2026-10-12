@@ -41,12 +41,23 @@ Kết quả Bronze của tôi có **3.021 dòng nguồn A**, **3.234 dòng ngu�
 ### Câu 2
 Pipeline đưa hai nguồn về một schema như thế nào (đơn vị, kiểu thời gian, **độ lệch đồng hồ**)? Bằng chứng nào trong kết quả bước 2 cho thấy đã đúng? Dán bảng quarantine của bạn (số dòng theo từng lý do, từng drive) và giải thích vì sao dòng lỗi vào `rejects` thay vì bị xoá.
 
-(trả lời ở đây)
+Nguồn A giữ tốc độ m/s và chuyển timestamp ISO sang `timestamptz`. Với nguồn B, staging đổi tên cột về schema chung, chia `spd_kmh` cho 3,6, chia giá trị bàn đạp phần trăm cho 100, và chuyển epoch millisecond sang timestamp sau khi trừ **1.500 ms** độ lệch đồng hồ. Hai nguồn được hợp nhất rồi phân loại thành dữ liệu sạch hoặc dữ liệu cách ly.
+
+Kết quả bước 2: A có **2.968 dòng sạch**, B có **3.181 dòng sạch**, tốc độ tối đa lần lượt **71,0 km/h** và **100,0 km/h**. Telemetry B bắt đầu tại **2025-10-08 14:30:00.009 UTC**, chỉ sau video bắt đầu lúc **14:30:00 UTC** khoảng **9 ms**, cho thấy độ lệch 1,5 giây đã được trừ. Kiểm tra module 2 đạt **7/7**.
+
+| Drive | `duplicate` | `speed_missing` | `speed_out_of_range` | Tổng cách ly |
+|---|---:|---:|---:|---:|
+| `drive_a` | 20 | 30 | 3 | 53 |
+| `drive_b` | 20 | 30 | 3 | 53 |
+
+Các số khớp phép bảo toàn số dòng: A có **2.968 + 53 = 3.021**, B có **3.181 + 53 = 3.234**. Dòng lỗi nằm trong `silver.silver_telemetry_rejects` kèm lý do để có thể truy vết, thống kê chất lượng nguồn và xử lý lại khi có quy tắc phù hợp, thay vì mất dấu do bị xoá.
 
 ### Câu 3
 Vì sao test `max_gap_ms` là `warn` còn `in_range` là `error`? Kết quả thí nghiệm `break-gate` của bạn (`break_gate.json`): test nào bắt được, bao nhiêu dòng, và điều đó cho biết gì về vai trò của "cổng chất lượng"?
 
-(trả lời ở đây)
+`max_gap_ms` có mức `warn` vì khoảng mất tín hiệu cảm biến là lỗi đã biết và được chấp nhận trong lab; pipeline vẫn ghi nhận cảnh báo và kiểm tra độ đồng bộ ở cấp khung hình. `in_range` dùng mức `error` vì tốc độ ngoài **0–70 m/s** không được phép đi vào dữ liệu sạch và dataset huấn luyện.
+
+Trong `report/evidence/break_gate.json`, khi nới luật làm sạch lên **1.000 m/s**, test **`in_range_silver_telemetry_speed_mps__70__0`** bắt được **6 dòng** sai: kết quả **PASS=5 WARN=1 ERROR=1 SKIP=0** và `gate_failed=true`. Khi khôi phục luật gốc, kết quả trở lại **PASS=6 WARN=1 ERROR=0 SKIP=0**. Thí nghiệm cho thấy cổng chất lượng kiểm tra độc lập với luật biến đổi: dù bước làm sạch cho dữ liệu xấu lọt qua, test vẫn phát hiện và trả lỗi để chặn các bước phía sau.
 
 ## Bước 3 · Silver frames
 
