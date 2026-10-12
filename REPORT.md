@@ -7,12 +7,12 @@
 | Họ và tên | `Hoàng Trung Khải` |
 | MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `2A202602947` |
 | GitHub | `khaihoang004` |
-| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
+| Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `trip-00722` |
 
 ## Kết quả cuối
 
-- `dataset_version` của bạn: `<điền>`  (phải khớp `report/evidence/run_summary.json`)
-- Số khung hình train / val / test của bạn: `<điền>`
+- `dataset_version` của bạn: `40c5e60cd5cc` (đối chiếu lại với `report/evidence/run_summary.json` sau lần chạy cuối).
+- Số khung hình train / val / test của bạn: **694 / 149 / 176**, tổng **1.019 khung**, thuộc **18 / 4 / 4 trip**.
 - `report/verify.txt`: tạo bằng `python3 scripts/check_submission.py --save-verify` (phải có `27/27 checks passed`).
 - Ảnh chụp trong `report/screenshots/`: `airflow_graph.png`, `minio_lake.png`, `metabase_dashboard.png`, và ảnh bài tập sập/chạy lại (log task đỏ thấy trip của bạn).
 
@@ -88,17 +88,26 @@ Kiểm tra module 3 đạt **6/6**, unit test đạt **9/9**. Độ trễ nối 
 ### Câu 6
 Dựa vào `leakage.json`: chia theo khung hình làm bao nhiêu trip bị chia cắt, so với chia theo trip? Vì sao điều này làm điểm kiểm thử đẹp một cách giả tạo?
 
-(trả lời ở đây)
+Trong `leakage.json`, **1.019 khung thuộc 26 trip** được dùng để so sánh. Chia theo khung hình làm **26/26 trip** nằm ở nhiều split và cả **26 trip** có khung trong cả train lẫn test; chia theo trip của pipeline làm **0 trip** bị chia cắt.
+
+Các khung gần nhau trong cùng chuyến thường có cảnh, ánh sáng và vật thể tương tự. Khi chúng xuất hiện ở cả train và test, mô hình có thể dựa vào cảnh gần như đã thấy thay vì khái quát sang chuyến mới, khiến điểm test lạc quan hơn năng lực thật. Chia theo trip giữ toàn bộ một cảnh trong một split; để đánh giá triển khai xa hơn vẫn cần xem xét tách theo ngày, tuyến đường hoặc xe.
 
 ### Câu 7
 Vì sao `dataset_version` là **băm nội dung** chứ không phải ngày giờ hay số đếm? Hai lần chạy liên tiếp cho kết quả gì? Vì sao `dataset_version` của bạn **khác** bạn bè dù cùng dữ liệu (liên hệ MSSV)?
 
-(trả lời ở đây)
+Trong mã lab, `dataset_version` là **12 ký tự đầu của SHA-256** tính trên các cặp **`frame_id|split` đã sắp xếp theo `frame_id`**. Cùng tập khung và cùng cách chia thì giữ nguyên version dù thời điểm export khác; ngày giờ hoặc số đếm sẽ tạo tên mới ngay cả khi nội dung không đổi. Đây là băm danh sách khung và split, không phải băm toàn bộ byte ảnh hoặc tất cả trường telemetry.
+
+Hai lần export liên tiếp với MSSV **`2A202602947`** đều cho version **`40c5e60cd5cc`** và split **694 train / 149 val / 176 test**. MSSV được nối với `trip_id` để tính MD5 xếp thứ tự trip trong mỗi drive, nên MSSV khác có thể làm đổi các trip thuộc từng split và đổi version. Khi thử MSSV **`2A202602948`** qua biến môi trường tạm của một lệnh, version đổi thành **`b3bbff2858a5`**; sau thí nghiệm tôi chạy lại với MSSV thật. File `.env` vẫn giữ MSSV đầy đủ, gồm cả chữ.
 
 ### Câu 8
 Đọc phần `lineage` trong `manifest.json` của dataset bạn. Trả lời "dataset này được tạo từ dữ liệu nào?" bằng chính nội dung đó. Nếu một người hỏi 3 tháng sau, thông tin nào giúp tái tạo lại đúng dataset này?
 
-(trả lời ở đây)
+Manifest lưu tại `s3://lake/gold/datasets/40c5e60cd5cc/manifest.json`; bản chụp ở checkpoint Gold nằm trong `report/evidence/gold_manifest.json`. Dataset dùng hai bảng Bronze telemetry A/B version **0**, `bronze.trips_raw` version **0**, `bronze.video_files` version **1**, `silver.frames` version **27**, và các bảng `silver.telemetry`, `silver.frames_flagged`, `silver.frame_telemetry` version **0**. Hai video đầu vào có SHA-256:
+
+- A: `636ba1a98dfc5ba665d1c935e1d2064e69f4df360ff9ffbd15795957d5e7e9aa`.
+- B: `bfa62703f645ff77a8578ae3fc74a00881140d38a404d43c8e2af265bbee9fdc`.
+
+Để tái tạo sau ba tháng, cần giữ dữ liệu gốc đúng hash, metadata trip/nguồn, MSSV **`2A202602947`**, commit mã và cấu hình xử lý, cùng manifest liệt kê khung/split và lịch sử Delta tương ứng. Version bảng là snapshot trong một lake cụ thể; reset lake sẽ tạo lịch sử mới, nên không được chỉ dựa vào số version để nhận diện dữ liệu. `dataset_version` riêng cũng chưa đủ xác nhận mọi byte ảnh hoặc nhãn telemetry không đổi.
 
 ## Bước 5 · Điều phối và phục vụ
 
