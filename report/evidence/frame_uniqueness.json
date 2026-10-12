@@ -1,0 +1,7 @@
+{
+  "student_id": "2A202602947",
+  "source": "Output from the SQL command run by the student after the final pipeline run",
+  "sql": "select count(*) as total_frames, count(distinct frame_id) as unique_frames from lake.silver_frames",
+  "total_frames": 1246,
+  "unique_frames": 1246
+}

@@ -114,7 +114,11 @@ Manifest lưu tại `s3://lake/gold/datasets/40c5e60cd5cc/manifest.json`; bản 
 ### Câu 9
 Mô tả chính xác điều xảy ra khi trip của bạn sập rồi chạy lại: bao nhiêu task chuyển đỏ, bao nhiêu task `upstream_failed`, bạn clear gì, dữ liệu có nhân đôi không, `dataset_version` có đổi không? Bằng chứng (ảnh, số) là gì?
 
-(trả lời ở đây)
+Phần số MSSV cho **202602947 % 26 = 1**, tương ứng **`trip-00722`**, Map Index **1**. Trong lần chạy `lab_failure_recovery_20261013`, đúng **1 task `silver_frames` thất bại**, **7 task downstream ở trạng thái `upstream_failed`**, còn **29 task instance thành công**. Log lần thử đầu ghi `simulated crash while extracting trip-00722`; xem `airflow_failure.json` và ảnh `airflow_failure_log.png`.
+
+Clear riêng task lỗi giúp trip này thành công ở **lần thử 2**, nhưng 7 task downstream vẫn bị chặn; `airflow_after_clear.json` ghi **30 success / 7 upstream_failed**. Vì vậy phải clear thêm đúng 7 task bị chặn, giữ nguyên các task đã thành công. Kết quả cuối trong `airflow_recovered.json` là **37/37 task instance success**: chỉ trip lỗi được trích xuất lại; 25 trip khác vẫn có một lần thử, và 7 task downstream chạy thành công ở lần thử đầu. Điểm này khác hướng dẫn giản lược rằng chỉ clear task đỏ là đủ.
+
+Ở lần kiểm tra cuối, truy vấn `silver.frames` cho **1.246 dòng và 1.246 `frame_id` duy nhất**, nên bảng hiện tại không có khung bị nhân đôi; `report/verify.txt` đạt **27/27**. `run_summary.json` vẫn ghi version **`40c5e60cd5cc`**, khớp checkpoint Gold trước thí nghiệm, cùng split **694 / 149 / 176**. Số đếm hiện tại được kiểm tra sau lần chạy cuối từ lake trống; bằng chứng không nhân đôi khi chạy lại một partition nằm riêng trong `idempotency.json`. Ảnh `airflow_graph.png` ghi lại Graph xanh sau phục hồi.
 
 ### Câu 10
 Nâng từ 2 drive lên **500 xe mỗi ngày**: ba thành phần nào của pipeline này sẽ vỡ đầu tiên, và bạn thay bằng gì (nối với slide 12, 22, 23)?
