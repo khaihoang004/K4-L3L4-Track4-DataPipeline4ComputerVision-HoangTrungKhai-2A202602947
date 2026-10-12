@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| Họ và tên | `<điền>` |
-| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `<điền>` |
-| GitHub | `<điền: tên tài khoản>` |
+| Họ và tên | `Hoàng Trung Khải` |
+| MSSV (đúng bằng `LAB_STUDENT_ID` trong `.env`) | `2A202602947` |
+| GitHub | `khaihoang004` |
 | Trip dùng cho bài tập sập và chạy lại (xem GUIDE, bước 5) | `<điền: trip-xxxxx>` |
 
 ## Kết quả cuối
@@ -21,7 +21,20 @@
 ### Câu 1
 Liệt kê **ít nhất 4 khác biệt** giữa telemetry nguồn A và nguồn B mà bạn thấy ở bronze. Vì sao pipeline giữ **mỗi nguồn một bảng bronze** và để mọi cột ở dạng chữ, thay vì gộp và ép kiểu ngay?
 
-(trả lời ở đây)
+Qua truy vấn hai bảng `lake.bronze_raw_telemetry_a` và `lake.bronze_raw_telemetry_b`, tôi thấy các khác biệt sau:
+
+| Nội dung | Nguồn A | Nguồn B |
+|---|---|---|
+| Thời gian | `ts_utc`, chuỗi ISO UTC, ví dụ `2025-10-07T08:00:00.014Z` | `timestamp_ms`, epoch millisecond, ví dụ `1759933801509` |
+| Tốc độ | `speed_mps`, đơn vị m/s | `spd_kmh`, đơn vị km/h |
+| Bàn đạp | `gas`, `brake`, tỷ lệ 0–1 | `throttle_pct`, `brake_pct`, phần trăm 0–100 |
+| Tên cột vị trí và hướng | `lat`, `lon`, `alt_m`, `heading_deg` | `latitude`, `longitude`, `altitude`, `hdg` |
+| Tên cột gia tốc và góc lái | `acc_x`, `acc_y`, `steer` | `ax`, `ay`, `steering` |
+| Độ lệch đồng hồ khai báo trong `bronze_video_files` | 0 ms | 1.500 ms; đồng hồ telemetry chạy trước đồng hồ video |
+
+Pipeline giữ mỗi nguồn một bảng Bronze để lưu đúng schema gốc và truy vết riêng từng nguồn khi schema thay đổi. Các cột dữ liệu từ CSV được giữ ở dạng chữ, kể cả ô trống, để chưa làm mất thông tin hoặc khiến quá trình nạp thất bại do ép kiểu. Việc đổi đơn vị, chuyển kiểu thời gian, sửa lệch đồng hồ và phân loại dòng lỗi được thực hiện ở Silver; dữ liệu gốc vẫn còn để đối chiếu hoặc xử lý lại. Các cột metadata do pipeline thêm có thể có kiểu riêng, như `_row_no` là số nguyên và `_ingested_at` là timestamp UTC.
+
+Kết quả Bronze của tôi có **3.021 dòng nguồn A**, **3.234 dòng nguồn B**, **26 trip** và **2 bản ghi video**; `scripts/lab.sh verify --module 1` đạt **5/5 checks passed**. Sau bước 1 có lượt nạp lại, lịch sử `bronze.raw_telemetry_a` vẫn chỉ có một commit `WRITE`, version **0**, thêm **3.021 dòng**. Kết quả này phù hợp với cơ chế nhận diện nội dung bằng SHA-256 và kiểm tra `_batch_id` trước khi ghi, giúp nạp lại cùng dữ liệu mà không nhân đôi.
 
 ## Bước 2 · Silver telemetry
 
